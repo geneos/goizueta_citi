@@ -1,0 +1,32 @@
+MANUAL DE CARGA DE FACTURAS E IMPUESTOS
+̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄
+El siguiente texto detalla la manera en que se deben cargar las facturas para que al exportarlas desde el componente CITI al AFIP, no haya inconvenientes.
+
+Productos no gravados: Cargarlos en la línea de la factura, con IVA 0%. En la pestaña "Impuestos de la factura" debe aparecer cargado el "Importe del impuesto" en 0 (cero) y la "Base del impuesto" con el valor deseado. Se aconseja hacer visible el campo "base del impuesto"
+
+Percepciones IIBB: Al ser un impuesto manual, de debe colocar en el "Importe del impuesto" el valor deseado y colocar en 0 (cero) la "Base del impuesto". Las percepciones ya no deberían cargarse en la línea de la factura
+
+Percepciones de IVA: Igual que Percepciones de IIBB. Es necesario marcar esta percepción como manual, si es que aún no lo está.
+
+
+PROCESO "Actualizar facturas CITI compras / ventas" DE LIBERTYA
+̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄
+Repara las facturas mal cargadas:
+*	Crea una percepción de IIBB a partir de la linea de factura. Elimina la linea de la factura.
+* Crea una percepción de IVA a partir de la linea de factura. Elimina la linea de la factura.
+* Crea un IVA0% a partir de líneas con productos no gravados.
+
+
+ERRORES AL CORRER EL APLICATIVO DE AFIP
+̄̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄ ̄
+1. "El campo tipo de comprobante contiene un código inválido o no corresponde a un comprobante de ventas/compras"
+El error se produce porque falta cargar el campo afipDoctype en la factura.
+Solución: Correr el proceso "Actualizar facturas CITI compras / ventas". Existe un método llamado fixDocType() que las repara.
+
+2. "El campo código de documento del comprador/vendedor debe ser igual a 80 - CUIT"
+El error se produce porque la factura está mal cargada. Generalmente es porque se hicieron facturas A a Consumidores finales
+Solución: Reparar las facturas mal cargadas a mano
+
+3. "El importe Total de la operación debe ser igual al Importe Neto gravado + Impuestos liquidados + demas importes de comprobantes"
+El error se produce porque no coinciden las sumas y el total de la factura. En este caso es necesario analizar los comprobantes y las alícuotas.
+El origen puede venir por diversos motivos, problemas con percepciones, IVA o demás.
