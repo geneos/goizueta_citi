@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.logging.Level;
 
 import org.openXpertya.model.MInvoiceLine;
+import org.openXpertya.model.MInvoiceTax;
 import org.openXpertya.model.MPeriod;
 import org.openXpertya.model.Query;
 import org.openXpertya.process.ProcessInfoParameter;
@@ -283,8 +284,37 @@ public class ExportaCITI extends SvrProcess {
  					la.append(bpIdentificadorFiscal);
  				}
 
+ 				/*
+ 				 * Fix realizado por Geneos para evitar que los impuestos excentos
+ 				 * se exporten en las alicuotas
+ 				 */
  				boolean write = false;
- 				 				
+ 				Double baseTax = 0.00;
+ 				Double importTax = 0.00;
+ 				if (esCreditoDebitoFiscal(citiReference)) {
+ 					baseTax = rs.getDouble(IX_INVOICE_TAX_AMT_BASE);
+ 					importTax = rs.getDouble(IX_INVOICE_TAX_AMT);
+ 					write = true;
+ 				} else if (q_alic == 0 && citiReference.equals(LP_C_Tax.CITIRG3685_ImportesExentos))
+ 					write = true;
+ 				if(write){
+					if(operacionCondicionIVA==null)
+						throw new OperacionCondicionIVAFaltanteException(cmpNumero);				
+	 				la.append(formatNumber(baseTax, 15));
+	 				la.append(padLeft(operacionCondicionIVA.toString(), 4, '0')); // Alícuota de IVA
+	 				la.append(formatNumber(importTax, 15)); // IVA liquidado
+					
+	 				q_alic++;
+	 				la.append(lineSeparator);
+	 				fw_a.write(la.toString());
+ 				}
+ 				/*
+ 				 * Fin modificacion de Geneos
+ 				 */
+ 				
+ 				
+ 				/*boolean write = false;
+ 				
  				if (esCreditoDebitoFiscal(citiReference))
  					write = true;
  				// resultset ordered by tax amount
@@ -302,7 +332,7 @@ public class ExportaCITI extends SvrProcess {
 	 				q_alic++;
 	 				la.append(lineSeparator);
 	 				fw_a.write(la.toString());
- 				}
+ 				}*/
 			}
 			
 			/*
@@ -348,7 +378,7 @@ public class ExportaCITI extends SvrProcess {
 				 * 	Modificación para considerar los no gravados
 				 * 	Geneos 03/12/2016
 				 *  
-				 
+				 */
 				Double nograv = 0.00;
 				if(cmpLetra.equals("B") || cmpLetra.equals("C")) {
 					lc.append(formatNumber(0d, 15));
@@ -374,10 +404,10 @@ public class ExportaCITI extends SvrProcess {
 				 */
 				
 				if(cmpLetra.equals("B") || cmpLetra.equals("C") || montoIVA == 0){
-					lc.append(formatNumber(0d, 15));
+					//lc.append(formatNumber(0d, 15));
 					lc.append(formatNumber(0d, 15));
 				}else {
-					lc.append(formatNumber(montoOperacionesExentas, 15));
+					//lc.append(formatNumber(montoOperacionesExentas, 15));
 					lc.append(formatNumber(0d, 15));					
 				}
 				lc.append(formatNumber(montoPercepcionesIVA, 15));
@@ -585,30 +615,25 @@ public class ExportaCITI extends SvrProcess {
 	 * los conceptos no grabados.
      */
     private Double calcularNoGravados(int invoice_id) {
-		
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		Double ret = (double) 0;
-		
-		try {
-			pstmt = DB.prepareStatement("select sum(linenetamt) from c_invoiceline " +
-					"where c_invoice_id = " + invoice_id + " and c_tax_id in (select c_tax_id from c_tax where rate = 0) and m_product_id in (select m_product_id from cg_productng)", get_TrxName());
-			
-			rs = pstmt.executeQuery();
-			if (rs.next()) {
-				return rs.getDouble(1);
-			} 
-		} catch (Exception e) { 
-			log.saveError("Exportacion CITI RG3685 - No", e);
-			e.printStackTrace();			
-		}
-				
-		return ret;
+		/*
+		 * Dado que el total de los importes No gravados se colocó en la base del impuesto IVA 0%
+		 * se lo toma desde ahí.
+		 * Este fix se hace en UpdateInvoicePercepciones.fixExempts
+		 */
+    	int taxID_iva0 = 1010087;
+    	List<Object> params = new ArrayList<Object>();
+    	final StringBuffer whereClause = new StringBuffer();
+    	whereClause.append("C_Invoice_ID = ? and C_Tax_ID = ?");
+    	params.add(invoice_id);
+    	params.add(taxID_iva0);
+    	Query q = new Query(this.getCtx(), MInvoiceTax.Table_Name, whereClause.toString(), this.get_TrxName());
+    	q.setParameters(params);
+    	MInvoiceTax result = q.first();
+    	return result != null ? result.getTaxBaseAmt().doubleValue() : 0D;
 	}
     
     private Double calcularPercepcionesIVA(int invoiceID) {
-    	int taxID_percepciones_iva = 1010164;
-    	
+    	int taxID_percepciones_iva = 1010164;   	
     	List<Object> params = new ArrayList<Object>();
 		StringBuffer whereClause = new StringBuffer();
 		whereClause.append("C_Invoice_ID = ? and C_Tax_ID = ?");
@@ -617,8 +642,7 @@ public class ExportaCITI extends SvrProcess {
 		Query q = new Query(this.getCtx(), MInvoiceLine.Table_Name, whereClause.toString(), get_TrxName());
 		q.setParameters(params);
 		MInvoiceLine result = q.first();
-		if(result != null) { return result.getLineNetAmount().doubleValue();}
-		else return 0.00;
+		return result != null ? result.getLineNetAmount().doubleValue() : 0D;
     }
 
 }
